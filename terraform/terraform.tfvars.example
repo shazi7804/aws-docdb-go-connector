@@ -1,0 +1,13 @@
+aws_region = "ap-southeast-1"
+cluster_identifier = "my-docdb-cluster"
+master_username = "root"
+master_password = "YourStrongPasswordHere"
+instance_count = 2
+instance_class = "db.t3.medium"
+vpc_id = "vpc-07ad03be7b7e2cf0c"
+subnet_ids = [
+  "subnet-03f8ad51d51c3da0e",
+  "subnet-099d03d2d559004d4",
+  "subnet-062b24149551fe782"
+]
+allowed_cidr_blocks = ["10.0.0.0/16"]
