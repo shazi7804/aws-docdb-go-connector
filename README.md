@@ -43,11 +43,11 @@ This repository provides a one-click deployment solution for AWS DocumentDB and 
    master_password = "YourStrongPasswordHere"
    instance_count = 2
    instance_class = "db.t3.medium"
-   vpc_id = "vpc-07ad03be7b7e2cf0c"
+   vpc_id = "vpc-your-vpc"
    subnet_ids = [
-     "subnet-03f8ad51d51c3da0e",
-     "subnet-099d03d2d559004d4",
-     "subnet-062b24149551fe782"
+     "subnet-your-subnet-1a",
+     "subnet-your-subnet-1b",
+     "subnet-your-subnet-1c"
    ]
    allowed_cidr_blocks = ["10.0.0.0/16"]
    ```
