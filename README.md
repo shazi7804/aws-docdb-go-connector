@@ -7,11 +7,131 @@ This repository provides a one-click deployment solution for AWS DocumentDB and 
 ### AWS Requirements
 - AWS account with appropriate permissions
 - AWS CLI installed and configured with access credentials
-- IAM permissions for:
-  - DocumentDB (rds:*)
-  - EC2 (ec2:CreateSecurityGroup, ec2:AuthorizeSecurityGroupIngress, ec2:CreateTags, etc.)
-  - VPC and Subnet access
-  - IAM role with sufficient permissions if running on EC2
+
+### Required IAM Permissions
+
+For successful deployment, your IAM user or role needs the following permissions:
+
+#### DocumentDB Permissions
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "rds:CreateDBCluster",
+        "rds:DeleteDBCluster",
+        "rds:CreateDBInstance",
+        "rds:DeleteDBInstance",
+        "rds:CreateDBSubnetGroup",
+        "rds:DeleteDBSubnetGroup",
+        "rds:DescribeDBClusters",
+        "rds:DescribeDBInstances",
+        "rds:DescribeDBSubnetGroups",
+        "rds:ModifyDBCluster",
+        "rds:ModifyDBInstance",
+        "rds:AddTagsToResource",
+        "rds:ListTagsForResource",
+        "rds:DescribeDBClusterParameters",
+        "rds:DescribeDBClusterParameterGroups",
+        "rds:CreateDBClusterParameterGroup",
+        "rds:ModifyDBClusterParameterGroup",
+        "rds:DeleteDBClusterParameterGroup"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+#### EC2 Permissions (for Security Groups and Network)
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateSecurityGroup",
+        "ec2:DeleteSecurityGroup",
+        "ec2:AuthorizeSecurityGroupIngress",
+        "ec2:AuthorizeSecurityGroupEgress",
+        "ec2:RevokeSecurityGroupIngress",
+        "ec2:RevokeSecurityGroupEgress",
+        "ec2:CreateTags",
+        "ec2:DeleteTags",
+        "ec2:DescribeSecurityGroups",
+        "ec2:DescribeVpcs",
+        "ec2:DescribeSubnets",
+        "ec2:DescribeAvailabilityZones",
+        "ec2:DescribeRouteTables",
+        "ec2:DescribeNetworkAcls"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+#### IAM Permissions (if using IAM authentication)
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateServiceLinkedRole",
+        "iam:GetRole",
+        "iam:PassRole"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+#### CloudWatch Permissions (for logging)
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogStreams",
+        "logs:DescribeLogGroups"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+#### KMS Permissions (if using encryption)
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "kms:CreateGrant",
+        "kms:Decrypt",
+        "kms:DescribeKey",
+        "kms:Encrypt",
+        "kms:GenerateDataKey*",
+        "kms:ReEncrypt*"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
 
 ### Software Requirements
 - Terraform v1.0.0 or later
@@ -21,6 +141,8 @@ This repository provides a one-click deployment solution for AWS DocumentDB and 
 ### Network Requirements
 - VPC with at least 3 subnets across different availability zones
 - Internet connectivity for downloading dependencies
+- Subnets must have proper route tables configured for DocumentDB access
+- Network ACLs must allow traffic on port 27017 (DocumentDB default port)
 
 ## Quick Start
 
@@ -43,11 +165,11 @@ This repository provides a one-click deployment solution for AWS DocumentDB and 
    master_password = "YourStrongPasswordHere"
    instance_count = 2
    instance_class = "db.t3.medium"
-   vpc_id = "vpc-your-vpc"
+   vpc_id = "vpc-xxxx"
    subnet_ids = [
-     "subnet-your-subnet-1a",
-     "subnet-your-subnet-1b",
-     "subnet-your-subnet-1c"
+     "Subnet-xxxx",
+     "Subnet-xxx",
+     "Subnet-xxx"
    ]
    allowed_cidr_blocks = ["10.0.0.0/16"]
    ```
@@ -95,6 +217,18 @@ This repository provides a one-click deployment solution for AWS DocumentDB and 
 | subnet_ids | List of subnet IDs for DocumentDB subnet group | (No default, must be specified) |
 | allowed_cidr_blocks | CIDR blocks allowed to connect to DocumentDB | ["10.0.0.0/16"] |
 
+### Advanced Configuration Options
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| engine_version | DocumentDB engine version | 4.0.0 |
+| backup_retention_period | Number of days to retain backups | 7 |
+| preferred_backup_window | Daily time range for backups (UTC) | "07:00-09:00" |
+| skip_final_snapshot | Whether to skip final snapshot when destroying | true |
+| deletion_protection | Enable deletion protection | false |
+| apply_immediately | Apply changes immediately or during maintenance window | true |
+| enabled_cloudwatch_logs_exports | Log types to export to CloudWatch | ["audit", "profiler"] |
+
 ### Go Application
 
 The Go application demonstrates:
@@ -113,24 +247,38 @@ The Go application demonstrates:
   - Implement IAM authentication for DocumentDB
   - Consider using VPC endpoints for enhanced security
   - Enable audit logging for DocumentDB
+  - Use a custom parameter group with secure settings
+  - Implement network isolation with private subnets
+  - Use encryption at rest with a customer-managed KMS key
 
 ## Troubleshooting
 
 ### Common Issues
 
 1. **Terraform Permission Errors**:
-   - Ensure your AWS credentials have sufficient permissions
+   - Ensure your AWS credentials have sufficient permissions (see IAM permissions section)
    - For EC2 instances, ensure the IAM role has the necessary policies
+   - Check CloudTrail logs for specific permission denials
 
 2. **Connection Issues**:
    - Verify security group allows traffic from your application
    - Check that your VPC and subnet configuration allows connectivity
    - Ensure SSL certificates are properly configured
+   - Verify that the DocumentDB cluster is in the 'available' state
+   - Check that your application has network access to the DocumentDB endpoint
 
 3. **Go Application Errors**:
    - Check that Go modules are properly initialized
    - Verify the connection string is correct
    - Ensure MongoDB driver is compatible with DocumentDB
+   - Check for SSL/TLS configuration issues
+   - Verify that the MongoDB driver version is compatible with DocumentDB
+
+4. **Deployment Failures**:
+   - Check Terraform state for detailed error messages
+   - Verify that your VPC has sufficient IP addresses available
+   - Ensure that you're not hitting service quotas/limits
+   - Check that the specified subnets are in different availability zones
 
 ## Cleanup
 
@@ -147,14 +295,9 @@ terraform destroy -auto-approve
 - Storage costs $0.10 per GB-month for the first 100 TB
 - I/O costs $0.20 per 1 million requests
 - Backup storage is free up to the size of your cluster
+- Data transfer costs vary by region and destination
+- CloudWatch logs incur additional charges if enabled
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-MIT
 
 ## Acknowledgments
 
