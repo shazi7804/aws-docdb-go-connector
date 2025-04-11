@@ -2,6 +2,8 @@ provider "aws" {
   region = var.aws_region
 }
 
+
+## DocumentDB
 resource "aws_docdb_cluster" "docdb" {
   cluster_identifier      = var.cluster_identifier
   engine                  = "docdb"
@@ -47,6 +49,59 @@ resource "aws_security_group" "docdb_sg" {
     Name = "${var.cluster_identifier}-security-group"
   }
 }
+
+## Web services
+module "ec2_instance" {
+  source  = "terraform-aws-modules/ec2-instance/aws"
+
+  name = "docdb-go-instance-connect"
+
+  instance_type          = "t3.micro"
+  key_name               = "scottliao"
+  vpc_security_group_ids = [aws_security_group.docdb_ec2_sg.id]
+  subnet_id              = var.subnet_ids[0]
+
+  tags = {
+    Name   = "docdb-go-instance-connect"
+  }
+
+  user_data = <<-EOL
+    #!/bin/bash
+    yum install -y git golang
+    git clone https://github.com/shazi7804/aws-docdb-go-connector
+    cd app/ && go build -o main .
+  EOL
+}
+
+resource "aws_security_group" "docdb_ec2_sg" {
+  name        = "docdb-ec2-sg"
+  description = "Docdb instance connect"
+  vpc_id      = var.vpc_id
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "null_resource" "docdb_user_setup" {
+  depends_on = [aws_docdb_cluster.docdb]
+
+  provisioner "local-exec" {
+    command = <<EOT
+      ANSIBLE_HOST_KEY_CHECKING=False \
+      ansible-playbook -i 'localhost,' \
+      -e docdb_endpoint="${aws_docdb_cluster.docdb.endpoint}" \
+      -e docdb_admin_user="${var.master_username}" \
+      -e docdb_admin_password="${var.master_password}" \
+      docdb-user.yml
+    EOT
+  }
+}
+
+
 
 output "docdb_endpoint" {
   value = aws_docdb_cluster.docdb.endpoint

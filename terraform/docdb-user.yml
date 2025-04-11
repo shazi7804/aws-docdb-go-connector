@@ -1,0 +1,23 @@
+- name: DocumentDB user management
+  hosts: localhost
+  connection: local
+  vars:
+    app_user: "app_db_user"
+    app_password: "app_db_password"
+  tasks:
+    - name: 安裝 MongoDB 客戶端
+      apt:
+        name: mongodb-clients
+        state: present
+
+    - name: 建立應用程式使用者
+      shell: |
+        mongosh --host {{ docdb_endpoint }} \
+          --username {{ docdb_admin_user }} \
+          --password {{ docdb_admin_password }} \
+          --eval 'db.getSiblingDB("admin").createUser({
+            user: "{{ app_user }}",
+            pwd: "{{ app_password }}",
+            roles: [{role: "readWriteAnyDatabase", db: "admin"}]
+          })'
+      no_log: true
